@@ -6,7 +6,7 @@
 
 Deploy Trino as the parallel SQL engine that reads the Iceberg tables Flink
 writes — loading manifests from Polaris over OAuth2 and pulling Parquet directly
-from MinIO with vended credentials. Trino is a **pure reader** at this layer; it
+from RustFS with vended credentials. Trino is a **pure reader** at this layer; it
 does not create or write tables. **In scope:** Helm deploy (coordinator +
 workers), the Iceberg REST catalog connector, OAuth2 + S3 wiring, CLI/client
 access.
@@ -25,11 +25,11 @@ flowchart TB
         coord -.reads.- cat
     end
     polaris[[Polaris REST :8181]]
-    minio[(MinIO lakehouse-*)]
+    rustfs[(RustFS lakehouse-*)]
     cli[Trino CLI / JDBC / SQLAlchemy]
     cli -->|SQL| coord
     coord -->|OAuth2 + manifests| polaris
-    w1 & w2 -->|Parquet via vended creds, path-style| minio
+    w1 & w2 -->|Parquet via vended creds, path-style| rustfs
 ```
 
 ## Configuration contract — `iceberg.properties`
@@ -44,7 +44,7 @@ The catalog connector file is the heart of this layer:
 | `iceberg.rest-catalog.security` | `OAUTH2` | client-credentials |
 | `iceberg.rest-catalog.oauth2.*` | client_id / client_secret / token endpoint | from Secret |
 | `iceberg.rest-catalog.vended-credentials-enabled` | `true` | consume Polaris-vended S3 creds |
-| `fs.native-s3.enabled` / `s3.*` | MinIO endpoint, **path-style**, region | `s3.path-style-access=true` |
+| `fs.native-s3.enabled` / `s3.*` | RustFS endpoint, **path-style**, region | `s3.path-style-access=true` |
 
 > **Both halves are required.** Pointing the connector at the REST catalog is not
 > sufficient on its own: table *metadata* resolves via the REST identity, but
@@ -69,7 +69,7 @@ sequenceDiagram
     participant C as Coordinator
     participant P as Polaris
     participant W as Workers
-    participant M as MinIO
+    participant M as RustFS
     U->>C: SELECT count(*) FROM iceberg.ns.table
     C->>P: OAuth2 token + resolve snapshot/manifests
     P-->>C: metadata + vended S3 creds
@@ -80,7 +80,7 @@ sequenceDiagram
 ```
 
 The coordinator resolves metadata once, then fans the Parquet files out as splits
-across workers — each worker reads directly from MinIO with the vended
+across workers — each worker reads directly from RustFS with the vended
 credentials, so data never flows back through Polaris.
 
 ## Inputs consumed / outputs produced
