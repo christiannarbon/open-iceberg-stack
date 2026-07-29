@@ -1,7 +1,7 @@
 # 04 — Governance & Security Architecture
 
 The defining feature of "Blueprint A" is **governed access**: engines never hold
-long-lived MinIO keys. They authenticate to Apache Polaris (the Iceberg REST
+long-lived RustFS keys. They authenticate to Apache Polaris (the Iceberg REST
 catalog) over OAuth2 client-credentials and receive *scoped, temporary* storage
 credentials — the pattern known as **credential vending**.
 
@@ -24,7 +24,7 @@ flowchart TB
         rbac --> vend
     end
 
-    subgraph minio["MinIO (S3)"]
+    subgraph rustfs["RustFS (S3)"]
         buckets[(lakehouse-raw / silver /<br/>gold / platinum)]
     end
 
@@ -50,7 +50,7 @@ flowchart TB
 4. Polaris checks **RBAC grants** and, for permitted operations, **vends scoped,
    temporary S3 credentials** (STS-style or configured static) alongside the
    metadata.
-5. The engine reads/writes the actual Parquet objects in MinIO using those
+5. The engine reads/writes the actual Parquet objects in RustFS using those
    temporary credentials — bounded to exactly the catalog's storage location.
 
 ## Sequence: Trino reads a table (read-only principal)
@@ -59,7 +59,7 @@ flowchart TB
 sequenceDiagram
     participant T as Trino
     participant P as Polaris
-    participant M as MinIO
+    participant M as RustFS
 
     T->>P: POST /oauth/tokens (client_credentials)
     P-->>T: access_token (short-lived)
@@ -87,11 +87,11 @@ Principals are granted only what their role in the pipeline requires:
 ```mermaid
 flowchart LR
     subgraph secrets["K8s Secrets (gitignored / templated)"]
-        minioRoot[MinIO root creds]
+        rustfsRoot[RustFS root creds]
         polRoot[Polaris root principal]
         engCreds[Per-engine client_id/secret]
     end
-    minioRoot --> minioPod[MinIO]
+    rustfsRoot --> rustfsPod[RustFS]
     polRoot --> polPod[Polaris bootstrap]
     engCreds --> flinkPod[Flink]
     engCreds --> trinoPod[Trino]
@@ -114,7 +114,7 @@ out of scope:
 - **Production identity provider** — OAuth2 is Polaris-internal client-credentials,
   not federated SSO.
 - **Network policies / service mesh** — not enforced.
-- **Data encryption at rest** beyond whatever MinIO/host provides.
+- **Data encryption at rest** beyond whatever RustFS/host provides.
 
 The architecture is *shaped* for these to be added (every engine already goes
 through OAuth2 + vending), but hardening is a follow-on, not part of the blueprint.
