@@ -51,7 +51,7 @@ flowchart LR
     end
 
     subgraph storage["Foundation & Storage"]
-        minio[(MinIO<br/>S3-compatible<br/>raw · silver · gold · platinum)]
+        rustfs[(RustFS<br/>S3-compatible<br/>raw · silver · gold · platinum)]
     end
 
     subgraph compute["Compute"]
@@ -71,11 +71,11 @@ flowchart LR
     end
 
     ds --> prod --> kafka --> flink
-    flink -->|Parquet data files| minio
+    flink -->|Parquet data files| rustfs
     flink -->|commit snapshot| polaris
 
     trino -->|load manifests / OAuth2| polaris
-    trino -->|read Parquet / vended creds| minio
+    trino -->|read Parquet / vended creds| rustfs
 
     dagster -->|orchestrates| dbt
     dbt -->|runs SQL on| trino
@@ -90,15 +90,15 @@ flowchart LR
 
 ### Reading the diagram
 
-- **The only writer of raw data is Flink.** It writes Parquet to MinIO and
+- **The only writer of raw data is Flink.** It writes Parquet to RustFS and
   commits the metadata swap to Polaris on every successful checkpoint. Nothing
   else writes the raw table.
 - **Trino is the universal read/execute engine.** dbt (transforms), Superset
   (BI), and the maintenance jobs *all* run their SQL through Trino — none of them
-  talk to MinIO or Polaris directly for table data.
+  talk to RustFS or Polaris directly for table data.
 - **Polaris is the single source of truth for table state.** Every engine
   resolves "what is the current snapshot / where are the files" through the REST
-  catalog, and receives scoped MinIO credentials from it (see
+  catalog, and receives scoped RustFS credentials from it (see
   [04 — Governance & Security](04-governance-and-security.md)).
 - **Dagster is the control plane for transforms and maintenance.** Its sensor
   keys off Iceberg commits (the checkpoint cadence from Flink) to trigger dbt;
@@ -110,7 +110,7 @@ flowchart LR
 | :--- | :--- | :--- |
 | Kafka | carries raw events | — |
 | Flink | writes Parquet + Iceberg data files | commits snapshots to Polaris |
-| MinIO | stores all Parquet + metadata objects | — |
+| RustFS | stores all Parquet + metadata objects | — |
 | Polaris | — | catalog state, RBAC, credential vending |
 | Trino | reads/writes table data on behalf of engines | — |
 | Dagster | — | sensor triggers + maintenance schedules |
@@ -125,7 +125,7 @@ full in the corresponding [low-level design](../lld/):
 
 ```mermaid
 flowchart LR
-    L1[Foundation<br/>& Storage] -->|cluster · StorageClass · MinIO endpoint · buckets| L2[Ingestion]
+    L1[Foundation<br/>& Storage] -->|cluster · StorageClass · RustFS endpoint · buckets| L2[Ingestion]
     L1 --> L3[Governance<br/>& Catalog]
     L3 -->|REST URI · OAuth2 client · vending mode| L4[Stream<br/>Processing]
     L2 -->|topic · JSON schema · bootstrap DNS| L4
