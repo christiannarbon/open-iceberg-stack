@@ -5,7 +5,7 @@
 ## Purpose & scope
 
 Deploy Flink to consume `raw-clickstream`, apply event-time + watermarks, and
-write Parquet to MinIO — committing one Iceberg snapshot through Polaris on every
+write Parquet to RustFS — committing one Iceberg snapshot through Polaris on every
 successful checkpoint. Flink is the **first and only writer** of the raw table.
 **In scope:** Flink Operator, a custom image (Iceberg + REST + S3 + Kafka jars),
 catalog/table wiring, the job, checkpointing, deploy.
@@ -32,14 +32,14 @@ flowchart TB
     operator -->|manages| fd
     kafka[[Kafka]] --> src
     polaris[[Polaris REST]] <-->|catalog + OAuth2 + vending| isink
-    minio[(MinIO lakehouse-raw)]
-    isink -->|Parquet data files| minio
-    isink -->|checkpoint state| minio
+    rustfs[(RustFS lakehouse-raw)]
+    isink -->|Parquet data files| rustfs
+    isink -->|checkpoint state| rustfs
 ```
 
 ## The custom image
 
-Vanilla Flink cannot talk to an Iceberg REST catalog on MinIO out of the box —
+Vanilla Flink cannot talk to an Iceberg REST catalog on RustFS out of the box —
 the required connectors are not on its classpath. A custom image bakes them in:
 
 ```mermaid
@@ -58,10 +58,10 @@ flowchart LR
 | Operator | Flink K8s Operator, `deploy/processing/` | manages `FlinkDeployment` CRs |
 | Image | custom `Dockerfile` in `apps/flink-jobs/` | Iceberg + REST + S3 + Kafka jars, pinned |
 | Catalog | type `rest`, URI → Polaris, OAuth2 client-credentials | vending mode per the [catalog contract](03-governance-catalog.md) |
-| S3 filesystem | endpoint → MinIO, **path-style**, vended creds | `s3.path-style-access=true` |
+| S3 filesystem | endpoint → RustFS, **path-style**, vended creds | `s3.path-style-access=true` |
 | Source | Kafka `raw-clickstream`, JSON format | schema per the [ingestion contract](02-ingestion-backbone.md) |
 | Time semantics | event-time from `event_time`, watermarks | bounded out-of-orderness |
-| Checkpointing | interval ~1 min, state backend → MinIO/S3 | **checkpoint = 1 Iceberg snapshot** |
+| Checkpointing | interval ~1 min, state backend → RustFS/S3 | **checkpoint = 1 Iceberg snapshot** |
 | Table | `iceberg.<ns>.<table>` + schema + partition spec | defined via DDL |
 | Write props | Iceberg format version, target file size, distribution mode | drives the [small-file surface](07-day-two-operations.md) |
 
@@ -71,7 +71,7 @@ flowchart LR
 sequenceDiagram
     participant K as Kafka
     participant F as Flink job
-    participant M as MinIO
+    participant M as RustFS
     participant P as Polaris
     K->>F: clickstream events
     F->>F: watermark + buffer
@@ -79,7 +79,7 @@ sequenceDiagram
     F->>M: flush Parquet data files
     F->>P: commit new snapshot (metadata swap)
     P-->>F: commit ok
-    Note over M,P: Parquet in MinIO + new snapshot in catalog
+    Note over M,P: Parquet in RustFS + new snapshot in catalog
 ```
 
 ## Inputs consumed / outputs produced
