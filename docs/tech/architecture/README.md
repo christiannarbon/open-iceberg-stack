@@ -23,7 +23,7 @@ per-engine wiring) see the low-level designs in [`../lld/`](../lld/).
 
 | Layer | Technology | Role | Design |
 | :--- | :--- | :--- | :--- |
-| Foundation & storage | Minikube, MinIO, Helm | K8s substrate + S3-compatible object store | [LLD 01](../lld/01-foundation-storage.md) |
+| Foundation & storage | Minikube, RustFS, Helm | K8s substrate + S3-compatible object store | [LLD 01](../lld/01-foundation-storage.md) |
 | Ingestion | Kafka (KRaft), Python producer | Streaming message backbone | [LLD 02](../lld/02-ingestion-backbone.md) |
 | Governance & catalog | Apache Polaris | Iceberg REST catalog + credential vending | [LLD 03](../lld/03-governance-catalog.md) |
 | Stream processing | Apache Flink, Apache Iceberg | Kafka → watermarked → Iceberg writer | [LLD 04](../lld/04-stream-processing.md) |
@@ -35,9 +35,9 @@ per-engine wiring) see the low-level designs in [`../lld/`](../lld/).
 ## Key architectural principles
 
 - **Compute/storage separation** — every engine (Flink, Trino) reads/writes the
-  same Iceberg tables in MinIO; none owns the data. The catalog is the only
+  same Iceberg tables in RustFS; none owns the data. The catalog is the only
   shared source of truth for table state.
-- **Governed access, not direct S3** — engines never hold long-lived MinIO
+- **Governed access, not direct S3** — engines never hold long-lived RustFS
   keys. They authenticate to Polaris over OAuth2 and receive *scoped, temporary*
   storage credentials (credential vending). See [04](04-governance-and-security.md).
 - **Event-driven, self-driving pipeline** — Flink commits one Iceberg snapshot
@@ -45,7 +45,7 @@ per-engine wiring) see the low-level designs in [`../lld/`](../lld/).
   auto-materializes dbt models. No human presses "run."
 - **Medallion tiers** — data is progressively refined `raw → silver → gold`
   (with a `platinum` tier reserved), each tier a set of Iceberg tables in its own
-  MinIO bucket.
+  RustFS bucket.
 - **Maintains itself** — scheduled Dagster jobs run Trino maintenance SQL
   (`OPTIMIZE`, `expire_snapshots`, `remove_orphan_files`) to fight the
   small-file problem inherent in streaming lakehouses.
