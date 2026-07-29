@@ -5,7 +5,7 @@ and how the data is progressively refined across the medallion tiers.
 
 ## The medallion tiers
 
-Data is refined in stages, each tier landing as Iceberg tables in its own MinIO
+Data is refined in stages, each tier landing as Iceberg tables in its own RustFS
 bucket:
 
 | Tier | Bucket | Owner | Contents |
@@ -94,7 +94,7 @@ flowchart LR
     sched[Dagster schedule<br/>overnight] --> opt[OPTIMIZE<br/>compact small files]
     opt --> exp[expire_snapshots<br/>drop old history]
     exp --> orph[remove_orphan_files<br/>reclaim storage]
-    orph --> minio[(MinIO:<br/>~1GB files, less history)]
+    orph --> rustfs[(RustFS:<br/>~1GB files, less history)]
 ```
 
 - **Order matters:** compact → expire snapshots → remove orphans.
