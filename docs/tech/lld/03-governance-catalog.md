@@ -5,7 +5,7 @@
 ## Purpose & scope
 
 Stand up Apache Polaris as the Iceberg REST Catalog with explicit governance:
-bootstrap a realm, create a MinIO-backed catalog, define RBAC, and enable
+bootstrap a realm, create a RustFS-backed catalog, define RBAC, and enable
 credential vending so downstream engines get scoped, temporary S3 access. **In
 scope:** deploy + metastore, realm/root bootstrap, catalog creation, RBAC. **Out
 of scope:** any writer or reader engine.
@@ -18,15 +18,15 @@ flowchart TB
         rest[[REST API :8181<br/>/api/catalog + /oauth/tokens]]
         realm[Realm<br/>bootstrapped]
         principals[Principals + roles<br/>RBAC grants]
-        catalog[Catalog: iceberg<br/>base loc → MinIO]
+        catalog[Catalog: iceberg<br/>base loc → RustFS]
         vend[Credential vending<br/>STS vs static]
         meta[(Metastore<br/>Postgres/PVC)]
         rest --> realm --> principals --> catalog --> vend
         catalog --- meta
     end
-    minio[(MinIO<br/>lakehouse-* buckets)]
-    vend -.scoped creds.-> minio
-    catalog -.base storage location.-> minio
+    rustfs[(RustFS<br/>lakehouse-* buckets)]
+    vend -.scoped creds.-> rustfs
+    catalog -.base storage location.-> rustfs
 ```
 
 ## Configuration contract
@@ -37,7 +37,7 @@ flowchart TB
 | REST endpoint | `polaris.<ns>.svc.cluster.local:8181/api/catalog` | in-cluster URI for engines |
 | Token endpoint | OAuth2 **client-credentials** grant | `/oauth/tokens` (realm-scoped) |
 | Realm | bootstrapped once, root principal | root only mints engine principals |
-| Catalog | name `iceberg`, base storage → MinIO bucket prefix | path-style S3 |
+| Catalog | name `iceberg`, base storage → RustFS bucket prefix | path-style S3 |
 | Vending mode | **STS** (temporary) vs **static** — decided here | the single most important downstream contract |
 | RBAC | principals, roles, grants per namespace | least-privilege enforced |
 
@@ -47,9 +47,9 @@ flowchart TB
 sequenceDiagram
     participant O as Operator (scripts)
     participant P as Polaris
-    participant M as MinIO
+    participant M as RustFS
     O->>P: deploy + bootstrap realm (root principal)
-    O->>P: create catalog "iceberg" (base loc → MinIO)
+    O->>P: create catalog "iceberg" (base loc → RustFS)
     P->>M: validate storage access
     O->>P: create engine principal (client_id/secret) + grants
     O->>P: POST /oauth/tokens (client_credentials)
@@ -82,7 +82,7 @@ flowchart LR
 ## Inputs consumed / outputs produced
 
 **Consumes (from the [foundation](01-foundation-storage.md)):** cluster,
-StorageClass, Helm tooling, MinIO + `lakehouse-*` buckets. No dependency on the
+StorageClass, Helm tooling, RustFS + `lakehouse-*` buckets. No dependency on the
 ingestion layer.
 
 **Produces — the catalog contract (to stream processing, compute, orchestration
@@ -91,7 +91,7 @@ and maintenance):**
 - Iceberg REST catalog URI (`http://polaris.<ns>.svc.cluster.local:8181/api/catalog`).
 - Realm name + OAuth2 token endpoint + client-credentials flow.
 - Per-engine `client_id`/`client_secret` (vended via Secret).
-- Catalog name (`iceberg`), its MinIO base storage location.
+- Catalog name (`iceberg`), its RustFS base storage location.
 - **Credential-vending mode** (STS vs static) — how engines get scoped S3 creds.
 
 Target folders: `deploy/catalog/` (Helm values / manifests + metastore),
