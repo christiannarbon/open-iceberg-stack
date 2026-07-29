@@ -11,7 +11,7 @@ Each LLD describes the system as built and is written to stand on its own.
 
 | # | LLD | Core component(s) |
 | :- | :--- | :--- |
-| 01 | [Foundation & Storage](01-foundation-storage.md) | Minikube, MinIO, PVCs, buckets |
+| 01 | [Foundation & Storage](01-foundation-storage.md) | Minikube, RustFS, PVCs, buckets |
 | 02 | [Ingestion Backbone](02-ingestion-backbone.md) | Kafka (KRaft), Python producer |
 | 03 | [Governance & Catalog](03-governance-catalog.md) | Apache Polaris, realm, RBAC, vending |
 | 04 | [Stream Processing](04-stream-processing.md) | Flink Operator, custom image, Iceberg sink |
@@ -37,6 +37,6 @@ Every document follows the same shape:
 
 - In-cluster DNS: `<svc>.<namespace>.svc.cluster.local:<port>` (see
   [architecture/03](../architecture/03-deployment-topology.md)).
-- MinIO is always addressed **path-style** (`s3.path-style-access=true`).
+- RustFS is always addressed **path-style** (`s3.path-style-access=true`).
 - Iceberg table identifiers are `<catalog>.<namespace>.<table>`.
 - Secrets are injected via K8s Secrets/env; repo holds placeholders only.
