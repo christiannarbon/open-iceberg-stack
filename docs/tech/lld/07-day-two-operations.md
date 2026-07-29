@@ -87,7 +87,7 @@ sequenceDiagram
     participant Sch as Dagster schedule
     participant T as Trino
     participant P as Polaris
-    participant M as MinIO
+    participant M as RustFS
     participant F as Flink (concurrent)
     Note over F: still writing hot partition
     Sch->>T: OPTIMIZE (closed partitions)
@@ -105,7 +105,7 @@ sequenceDiagram
 **Consumes:** the [commit cadence + live-writer constraint](04-stream-processing.md);
 [Trino](05-compute-engine.md) as executor; the
 [Dagster scheduler + dbt tables](06-orchestration-transform.md);
-[catalog grants](03-governance-catalog.md); [MinIO](01-foundation-storage.md).
+[catalog grants](03-governance-catalog.md); [RustFS](01-foundation-storage.md).
 
 **Produces — the maintenance contract (to BI and operators):**
 
