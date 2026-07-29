@@ -20,10 +20,10 @@ flowchart TB
 
     subgraph cluster["Minikube cluster"]
         subgraph nsStorage["ns: storage"]
-            minioSvc[[Service: minio :9000 / :9001]]
-            minioPod[MinIO pod]
-            minioPvc[(PVC 10Gi)]
-            minioSvc --- minioPod --- minioPvc
+            rustfsSvc[[Service: rustfs :9000 / :9001]]
+            rustfsPod[RustFS pod]
+            rustfsPvc[(PVC 10Gi)]
+            rustfsSvc --- rustfsPod --- rustfsPvc
         end
 
         subgraph nsIngest["ns: ingestion"]
@@ -45,7 +45,7 @@ flowchart TB
         subgraph nsProcess["ns: processing"]
             flinkOp[Flink K8s Operator]
             flinkDep[FlinkDeployment CR<br/>JobManager + TaskManagers]
-            flinkCkpt[(Checkpoints → MinIO)]
+            flinkCkpt[(Checkpoints → RustFS)]
             flinkOp -->|manages| flinkDep
             flinkDep -.-> flinkCkpt
         end
@@ -75,7 +75,7 @@ flowchart TB
     end
 
     helm -->|installs releases| cluster
-    kubectl -.-> minioSvc
+    kubectl -.-> rustfsSvc
     kubectl -.-> trinoSvc
     kubectl -.-> dagWeb
     kubectl -.-> supSvc
@@ -89,7 +89,7 @@ Each layer owns a `deploy/` subfolder of committed Helm values / manifests:
 | Release | Chart | `deploy/` folder | Namespace (convention) |
 | :--- | :--- | :--- | :--- |
 | *(cluster baseline)* | — | `deploy/cluster/` | — |
-| MinIO | MinIO Helm chart | `deploy/storage/` | `storage` |
+| RustFS | RustFS Helm chart | `deploy/storage/` | `storage` |
 | Kafka | Kafka (KRaft) chart | `deploy/ingestion/` | `ingestion` |
 | Polaris | Polaris deploy values | `deploy/catalog/` | `catalog` |
 | Flink Operator + Deployment | Flink K8s Operator | `deploy/processing/` | `processing` |
@@ -113,28 +113,28 @@ every layer contract:
 
 | Service | In-cluster DNS (shape) | Port | Consumed by |
 | :--- | :--- | :--- | :--- |
-| MinIO S3 API | `minio.<ns>.svc.cluster.local` | 9000 | Polaris, Flink, Trino |
-| MinIO console | `minio.<ns>.svc.cluster.local` | 9001 | operator (port-forward) |
+| RustFS S3 API | `rustfs.<ns>.svc.cluster.local` | 9000 | Polaris, Flink, Trino |
+| RustFS console | `rustfs.<ns>.svc.cluster.local` | 9001 | operator (port-forward) |
 | Kafka bootstrap | `kafka.<ns>.svc.cluster.local` | 9092 | Producer, Flink |
 | Polaris REST catalog | `polaris.<ns>.svc.cluster.local` | 8181 | Flink, Trino, Dagster sensor |
 | Trino coordinator | `trino.<ns>.svc.cluster.local` | 8080 | dbt, Superset, maintenance jobs, CLI |
 | Dagster webserver | `dagster.<ns>.svc.cluster.local` | 3000 | operator (port-forward) |
 | Superset | `superset.<ns>.svc.cluster.local` | 8088 | analysts (port-forward) |
 
-> **Path-style S3 access is required** everywhere MinIO is addressed
-> (`s3.path-style-access=true`) — MinIO does not support virtual-hosted-style
+> **Path-style S3 access is required** everywhere RustFS is addressed
+> (`s3.path-style-access=true`) — RustFS does not support virtual-hosted-style
 > bucket addressing by default.
 
 ## Persistence
 
 | Workload | Persisted state | Backed by |
 | :--- | :--- | :--- |
-| MinIO | all Parquet + Iceberg metadata objects | PVC (lean 10Gi local profile) |
+| RustFS | all Parquet + Iceberg metadata objects | PVC (lean 10Gi local profile) |
 | Kafka | topic log segments | PVC |
 | Polaris | catalog metastore (namespaces, tables, grants) | Postgres/PVC |
-| Flink | checkpoints + savepoints | MinIO (S3 state backend) |
+| Flink | checkpoints + savepoints | RustFS (S3 state backend) |
 | Superset/Postgres | dashboards, datasets, users | PVC |
 | Redis | ephemeral query cache | none (cache) |
 
-Everything data-bearing is backed by a PVC (or MinIO) so state survives pod
+Everything data-bearing is backed by a PVC (or RustFS) so state survives pod
 restarts.
