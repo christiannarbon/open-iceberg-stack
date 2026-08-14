@@ -6,7 +6,16 @@ This directory contains the declarative cluster configuration for `open-iceberg-
 
 The cluster runs under a dedicated, isolated Minikube profile (`open-iceberg`) using the `docker` driver and a pinned Kubernetes version (`v1.30.0`).
 
-All cluster launch parameters are centrally declared in [`cluster.env`](cluster.env).
+All cluster launch parameters and required addons are centrally declared in [`cluster.env`](cluster.env).
+
+## StorageClass & Dynamic Provisioning
+
+Minikube dynamic persistent volume provisioning is configured via two required addons:
+- `default-storageclass`: Marks the `standard` StorageClass as the default (`storageclass.kubernetes.io/is-default-class: "true"`).
+- `storage-provisioner`: Supplies the `k8s.io/minikube-hostpath` dynamic provisioner.
+
+### StorageClass Limitations
+- **Access Mode Limitation:** The bundled hostpath dynamic provisioner supports **ReadWriteOnce (RWO)** access mode only. It does **not** support ReadWriteMany (RWX) multi-node attachment. Any downstream workloads requiring persistent storage must configure claims with `ReadWriteOnce` access mode.
 
 ## Sizing Profiles
 
@@ -43,8 +52,14 @@ Two resource sizing profiles are defined:
 # Load cluster variables for Default (Foundation) profile:
 source deploy/cluster/cluster.env
 minikube start ${MINIKUBE_START_ARGS}
+for addon in ${ADDONS}; do
+  minikube addons enable ${addon} -p ${PROFILE}
+done
 
 # Load cluster variables for Full-Stack profile:
 FULL_STACK=1 source deploy/cluster/cluster.env
 minikube start ${MINIKUBE_START_ARGS}
+for addon in ${ADDONS}; do
+  minikube addons enable ${addon} -p ${PROFILE}
+done
 ```
