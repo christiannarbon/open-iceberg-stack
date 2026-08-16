@@ -9,9 +9,23 @@
 
 This document records the empirical lifecycle verification of the local Minikube Kubernetes cluster (`open-iceberg`) and defines the dual resource sizing profiles for `open-iceberg-stack`.
 
+## Validation Host Specifications (Reference Machine)
+
+> **Note:** The hardware specifications below represent the **Validation Host** environment where empirical timing benchmarks were measured. This validation host is **NOT** the minimum system floor required to run the stack.
+
+- **Operating System:** macOS 26.5.2 (Build 25F84, Kernel 25.5.0 arm64)
+- **Architecture:** `arm64` (Apple Silicon)
+- **CPU Cores:** 14 logical cores
+- **System Memory:** 36 GiB RAM (38,654,705,664 bytes)
+- **Container Driver:** Docker Desktop 29.1.4-rd (Engine version 29.3.1)
+- **Validated Tool Versions:**
+  - `minikube`: `v1.38.1`
+  - `kubectl` client: `v1.36.1`
+  - Kubernetes server: `v1.30.0` (pinned via `--kubernetes-version`)
+
 ## Lifecycle Performance Results
 
-The complete create -> ready -> teardown loop was benchmarked using the automated repository helper scripts:
+The complete create -> ready -> teardown loop was benchmarked on the validation host using the automated repository helper scripts:
 
 | Lifecycle Action | Execution Command | Time Elapsed | Target Budget | Verification Result |
 | :--- | :--- | :--- | :--- | :--- |
@@ -25,9 +39,9 @@ The complete create -> ready -> teardown loop was benchmarked using the automate
 $ ./scripts/cluster-up.sh
 =======================================================================
 Provisioning Minikube Cluster: open-iceberg
-Sizing Profile: FULL_STACK=0 (CPUs=2, Memory=4096MB, Disk=20g)
+Requested Sizing Profile: FULL_STACK=0 (CPUs=2, Memory=4096MB, Disk=20g)
 =======================================================================
-Starting cluster 'open-iceberg' with parameters: -p open-iceberg --driver=docker --kubernetes-version=v1.30.0 --cpus=2 --memory=4096 --disk-size=20g
+Starting cluster 'open-iceberg' with parameters: -p open-iceberg --driver=docker --kubernetes-version=v1.30.0 --cpus=2 --memory=4096 --disk-size=20g --interactive=false
 * [open-iceberg] minikube v1.38.1 on Darwin 26.5.2 (arm64)
 * Done! kubectl is now configured to use "open-iceberg" cluster and "default" namespace by default
 =======================================================================
@@ -51,7 +65,7 @@ Two sizing profiles are established for local development:
 ### 1. Foundation Profile (Default)
 - **Allocation:** `--cpus 2 --memory 4096 --disk-size 20g` (2 vCPU / 4 GiB RAM / 20 GiB disk ceiling)
 - **Target Workload:** Provisions the local Kubernetes cluster infrastructure and RustFS S3 object storage substrate.
-- **Minimum System Requirement:** Dual-core CPU, 8 GiB host RAM. Intentionally lightweight to enable quick local onboarding.
+- **Minimum System Requirement Floor:** Dual-core CPU, 8 GiB host RAM. Intentionally lightweight to enable quick local onboarding.
 
 ### 2. Lean Full-Stack Profile (Opt-in)
 - **Allocation:** `--cpus 4 --memory 7168 --disk-size 30g` (4 vCPU / 7 GiB RAM / 30 GiB disk ceiling)

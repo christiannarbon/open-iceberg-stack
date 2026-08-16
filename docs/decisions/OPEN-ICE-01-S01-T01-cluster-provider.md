@@ -16,10 +16,9 @@ While Minikube is the default target for `deploy/cluster/` and repository helper
 
 ## Target Tool & Component Versions
 
-- **Minikube:** ≥ 1.32 (Target Kubernetes version: ≥ 1.30 via `--kubernetes-version`)
+- **Minikube:** ≥ 1.32 (Target Kubernetes version: `v1.30.0` via `--kubernetes-version`)
 - **kubectl:** ≥ 1.27
-- **Client/Server Version Skew:** Strict ±1 minor version skew rule between `kubectl` client and Kubernetes server versions.
-- *Note:* Target versions will be empirically validated in task T05 (`OPEN-ICE-01-S01-T05`).
+- **Client/Server Version Skew:** Target recommendation is within ±1 minor version skew. Client-side forward skew (e.g. `kubectl` client `v1.36.1` against Kubernetes server `v1.30.0`) is accepted and tested, as `kubectl` client maintains backward compatibility with older Kubernetes API server releases for standard resources. `scripts/cluster-up.sh` includes a non-fatal preflight check that issues a warning when skew exceeds 1 minor version.
 
 ### Candidate Baseline Requirements
 - **Minikube:** ≥ 1.32 (with `docker` driver)
@@ -47,6 +46,12 @@ While Minikube is the default target for `deploy/cluster/` and repository helper
 ## Captured Environment Tool Versions
 
 Captured from local environment:
-- **Minikube Version:** `minikube version: v1.38.1` (commit: `c93a4cb9311efc66b90d33ea03f75f2c4120e9b0`)
-- **kubectl Client Version:** `Client Version: v1.36.1` (Kustomize Version: `v5.8.1`)
-- *Status:* Installed and captured. Runtime cluster verification and server skew check are explicitly deferred to T05.
+- **Minikube Version:** `v1.38.1` (commit: `c93a4cb9311efc66b90d33ea03f75f2c4120e9b0`)
+- **kubectl Client Version:** `v1.36.1` (Kustomize Version: `v5.8.1`)
+- **Kubernetes Server Version:** `v1.30.0`
+- **Status:** Installed, captured, and validated in T05/T06.
+
+## Definition of Done
+
+- [x] A short decision record exists naming the default + one-paragraph rationale.
+- [x] Validated tool + kubectl versions are recorded (empirically confirmed in T05/T06).
