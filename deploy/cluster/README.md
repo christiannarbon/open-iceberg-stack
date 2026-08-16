@@ -33,7 +33,7 @@ Two resource sizing profiles are defined:
 ### 2. Lean Full-Stack Profile (Opt-in)
 - **Parameters:** `--cpus 4 --memory 7168 --disk-size 30g`
 - **Use Case:** Required when deploying the full streaming and query stack (Kafka, Flink, Trino, Superset).
-- **Activation:** Set `FULL_STACK=1` prior to invoking cluster creation (e.g., `FULL_STACK=1 ./scripts/cluster-up.sh` or `FULL_STACK=1 minikube start ...`).
+- **Activation:** Set `FULL_STACK=1` prior to invoking cluster creation (e.g., `FULL_STACK=1 ./scripts/cluster-up.sh`).
 
 ## Resource Constraints & OOM / Swap Caveats
 
@@ -46,20 +46,29 @@ Two resource sizing profiles are defined:
 - All cluster operations target the dedicated profile `open-iceberg` (`-p open-iceberg`).
 - Operations will **never** target or modify the default Minikube profile or host `docker-desktop` context, ensuring clean teardown without risk to unrelated local clusters.
 
-## Invocation Example
+## Invocation Examples (Compatible with bash and zsh)
+
+The primary interface for cluster management is via the helper scripts in `scripts/`:
 
 ```bash
-# Load cluster variables for Default (Foundation) profile:
-source deploy/cluster/cluster.env
-minikube start ${MINIKUBE_START_ARGS}
-for addon in ${ADDONS}; do
-  minikube addons enable ${addon} -p ${PROFILE}
-done
+# Bring up cluster with default (Foundation) profile:
+./scripts/cluster-up.sh
 
-# Load cluster variables for Full-Stack profile:
-FULL_STACK=1 source deploy/cluster/cluster.env
-minikube start ${MINIKUBE_START_ARGS}
-for addon in ${ADDONS}; do
-  minikube addons enable ${addon} -p ${PROFILE}
-done
+# Bring up cluster with Full-Stack profile:
+FULL_STACK=1 ./scripts/cluster-up.sh
+
+# Recreate cluster automatically when switching profile sizing:
+FULL_STACK=1 RECREATE=1 ./scripts/cluster-up.sh
+
+# Teardown cluster and clean context:
+./scripts/cluster-down.sh
+```
+
+### Shell-Safe Raw Invocation (bash and zsh)
+
+If invoking `minikube` directly, wrap in `bash -c` to ensure portable argument word-splitting across both `bash` and `zsh`:
+
+```bash
+# Load cluster variables and start (shell-safe for bash/zsh):
+bash -c 'source deploy/cluster/cluster.env && minikube start ${MINIKUBE_START_ARGS}'
 ```
