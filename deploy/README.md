@@ -1,6 +1,6 @@
 # Deployment & Helm Tooling Baseline (`deploy/`)
 
-This document defines the deployment tooling baseline, Helm version requirements, installation procedures, namespace conventions, and directory organization for `open-iceberg-stack`.
+This document defines the deployment tooling baseline, Helm version requirements, installation procedures, namespace conventions, values-file layout, version pinning policy, and resource-budget policies for `open-iceberg-stack`.
 
 ## Helm Version Requirement
 
@@ -60,6 +60,64 @@ helm version --short
 
 Expected output should indicate version `v3.12.0` or higher (e.g., `v3.15.2` or `v4.0.5`).
 
+## Values-File Layout Convention
+
+Every stack component maintains its declarative Helm override configuration in a dedicated `values.yaml` file under its respective component directory:
+
+`deploy/<component>/values.yaml`
+
+Examples:
+- Storage Substrate: `deploy/storage/values.yaml`
+- REST Catalog: `deploy/catalog/values.yaml`
+- Streaming Ingestion: `deploy/ingestion/values.yaml`
+- Compute Processing: `deploy/processing/values.yaml`
+- Distributed Query: `deploy/query/values.yaml`
+- Business Intelligence: `deploy/bi/values.yaml`
+- Workflow Orchestration: `deploy/orchestration/values.yaml`
+- Maintenance Utilities: `deploy/maintenance/values.yaml`
+
+**Convention Rules:**
+1. All custom configurations, resource overrides, replica counts, and container arguments **must** be declared within the respective `deploy/<component>/values.yaml` file.
+2. Ad-hoc `--set` flags in deployment scripts are strictly prohibited except for transient dynamic secrets or context parameters.
+
+## Chart-Version Pinning Policy
+
+To guarantee deterministic, reproducible deployments across developer environments and CI pipelines:
+
+1. **Strict Version Pinning:** Every Helm chart version **must** be explicitly pinned to an exact release version. Using `latest`, unpinned charts, or floating version ranges is strictly forbidden.
+2. **Single Authoritative Registry:** All pinned chart versions and bundled container `appVersion` targets are recorded in a single authoritative file: [`deploy/versions.env`](versions.env).
+3. **Dual Version Tracking:** For every component, both the **Chart Version** (the packaging metadata version) and the **App Version** (the underlying application container image tag) are explicitly recorded.
+
+### Authoritative Component Version Registry
+
+| Component | Target Namespace | Chart Version | App Version | Pinned Env Variable |
+| :--- | :--- | :--- | :--- | :--- |
+| **RustFS (Storage)** | `storage` | `0.1.0` | `1.0.0` | `RUSTFS_CHART_VERSION` / `RUSTFS_APP_VERSION` |
+| **Iceberg REST Catalog** | `catalog` | `0.1.0` | `0.7.1` | `CATALOG_CHART_VERSION` / `CATALOG_APP_VERSION` |
+| **Kafka (Ingestion)** | `ingestion` | `0.41.0` | `3.7.0` | `KAFKA_CHART_VERSION` / `KAFKA_APP_VERSION` |
+| **Flink (Processing)** | `processing` | `1.19.0` | `1.19.0` | `FLINK_CHART_VERSION` / `FLINK_APP_VERSION` |
+| **Trino (Query Engine)** | `query` | `0.28.0` | `442` | `TRINO_CHART_VERSION` / `TRINO_APP_VERSION` |
+| **Superset (BI)** | `bi` | `0.12.8` | `4.0.1` | `SUPERSET_CHART_VERSION` / `SUPERSET_APP_VERSION` |
+| **Airflow (Orchestration)** | `orchestration` | `1.13.0` | `2.9.1` | `AIRFLOW_CHART_VERSION` / `AIRFLOW_APP_VERSION` |
+
+## Resource-Budget Policy (Lean ~7 GiB Full Stack)
+
+To ensure the entire lakehouse platform fits within the lean full-stack local profile (~4 vCPU / 7 GiB RAM / 30 GiB disk ceiling), every component's `values.yaml` must strictly adhere to the following resource-budget rules:
+
+### Mandatory Resource Rules:
+1. **Single Replica Execution:** All stateful and stateless services (Kafka brokers, Flink TaskManagers, Trino workers, Superset pods, Airflow workers) **must** run with `replicaCount: 1`. Multi-replica or high-availability (HA) topologies are forbidden in local environments.
+2. **Explicit Resource Requests & Limits:** Every pod specification **must** declare explicit `resources.requests` and `resources.limits` for CPU and Memory. Uncapped pods are strictly forbidden.
+3. **Capped JVM Heaps:** JVM-based components (Kafka, Flink JobManager/TaskManager, Trino coordinator) **must** strictly cap Java heap sizes via environment variables or flags (e.g., `-Xms`, `-Xmx`, `KAFKA_HEAP_OPTS`) to ensure heap allocations do not exceed memory limits and trigger OOM Kills.
+
+### Component Memory Allocation Floor (~7 GiB Total)
+- `storage` (RustFS): ~512 MiB RAM
+- `catalog` (REST Catalog): ~512 MiB RAM
+- `ingestion` (Kafka + Zookeeper/KRaft): ~1.5 GiB RAM (JVM heap capped at 1.0 GiB)
+- `processing` (Flink JobManager + TaskManager): ~1.5 GiB RAM (JVM heap capped at 1.0 GiB)
+- `query` (Trino Single-Node): ~1.75 GiB RAM (JVM heap capped at 1.25 GiB)
+- `bi` (Superset): ~768 MiB RAM
+- `orchestration` (Airflow / Maintenance): ~512 MiB RAM
+
 ## Namespace Convention & Strategy
 
 `open-iceberg-stack` adopts a **Per-Component Namespace Strategy**.
@@ -104,9 +162,10 @@ kubectl create namespace storage --dry-run=client -o yaml | kubectl apply -f -
 ## Repository Organization (`deploy/`)
 
 Per-component Helm values and configuration manifests are organized under `deploy/`:
+- `deploy/versions.env`: Authoritative chart and appVersion registry.
 - `deploy/namespaces.yaml`: Consolidated per-component Namespace manifest.
 - `deploy/cluster/`: Local Kubernetes cluster definition & provider config.
-- `deploy/storage/`: Object storage substrate (RustFS) Helm values & manifests.
+- `deploy/storage/`: Object storage substrate (RustFS) Helm values (`deploy/storage/values.yaml`).
 - `deploy/catalog/`: Iceberg REST Catalog values & configuration.
 - `deploy/processing/`: Engine processing component values (Flink / Spark).
 - `deploy/ingestion/`: Streaming ingestion components (Kafka).
